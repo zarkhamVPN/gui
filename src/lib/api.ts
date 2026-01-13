@@ -1,7 +1,7 @@
 // Zarkham API Client
 // Communicates with the local Go CLI daemon
 
-const API_BASE = "http://localhost:8088/api";
+const API_BASE = "/api";
 
 // --- Warden API ---
 
@@ -95,6 +95,26 @@ export async function manualConnect(multiaddr: string) {
     return await res.json();
 }
 
+// --- Node Control ---
+
+export async function getNodeStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/node/status`);
+        if (!res.ok) throw new Error("Status Error");
+        return await res.json();
+    } catch (e) {
+        return { isRunning: false };
+    }
+}
+
+export async function startNode() {
+    await fetch(`${API_BASE}/node/start`, { method: "POST" });
+}
+
+export async function stopNode() {
+    await fetch(`${API_BASE}/node/stop`, { method: "POST" });
+}
+
 // --- Wallet API ---
 
 export async function getWalletBalance(profile: string) {
@@ -108,11 +128,61 @@ export async function getWalletBalance(profile: string) {
 }
 
 export async function getAddresses() {
+
     try {
+
         const res = await fetch(`${API_BASE}/addresses`);
+
         if (!res.ok) return {};
+
         return await res.json();
+
     } catch (e) {
+
         return {};
+
     }
+
+}
+
+
+
+export async function getProfile() {
+
+    try {
+
+        const res = await fetch(`${API_BASE}/profile`);
+
+        if (!res.ok) return { profile: 'warden' };
+
+        return await res.json();
+
+    } catch (e) {
+
+        return { profile: 'warden' };
+
+    }
+
+}
+
+
+
+export async function getHistory(profile: string) {
+
+
+
+    try {
+
+        const res = await fetch(`${API_BASE}/history?profile=${profile}`);
+
+        if (!res.ok) throw new Error("History API Error");
+
+        return await res.json();
+
+    } catch (e) {
+
+        return { solHistory: [], arkhamHistory: [], connectionHistory: [], throughputHistory: [] };
+
+    }
+
 }

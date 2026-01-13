@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
-    import { getWalletBalance, getAddresses } from "$lib/api";
+    import { getWalletBalance, getAddresses, getProfile } from "$lib/api";
     import { Wallet, ArrowRight, Copy, ExternalLink, RefreshCw } from "lucide-svelte";
 
     let balance = 0;
@@ -18,7 +18,10 @@
     async function refreshWallet() {
         loading = true;
         try {
-            const balData = await getWalletBalance("warden"); // Default profile
+            const profileData = await getProfile();
+            const profile = profileData.profile || "warden"; // Fallback if API fails
+            
+            const balData = await getWalletBalance(profile);
             balance = balData.lamports / 1e9;
             addresses = await getAddresses();
         } catch (e) {

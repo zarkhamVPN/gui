@@ -1,44 +1,139 @@
-<script>
+<script lang="ts">
   import "../app.css";
+  import ToastContainer from "$lib/components/ui/ToastContainer.svelte";
+  import { Shield, Radio, ChevronDown, Wifi, Lock } from "lucide-svelte";
+  import { activeMode, activeTab } from "$lib/stores/app";
+  import { onMount } from "svelte";
+  import { getProfile } from "$lib/api";
+
+  let showDropdown = false;
+
+  onMount(async () => {
+      const data = await getProfile();
+      if (data.profile === 'seeker') {
+          $activeMode = 'seeker';
+      } else {
+          $activeMode = 'warden';
+      }
+  });
+
+  function switchMode(mode: 'warden' | 'seeker') {
+      $activeMode = mode;
+      $activeTab = 'overview';
+      showDropdown = false;
+  }
+
+  function setTab(tab: string) {
+      $activeTab = tab;
+  }
 </script>
 
 <svelte:head>
   <title>ZARKHAM</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
 </svelte:head>
 
 <div class="min-h-screen flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
-  <!-- Header -->
-  <header class="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
-    <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+  <div class="star-layer"></div>
+  <ToastContainer />
+  
+  <!-- Main Header -->
+  <header class="border-b border-border bg-black/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+      <!-- Logo -->
       <div class="flex items-center gap-2">
-        <div class="w-3 h-8 bg-primary"></div>
-        <h1 class="text-2xl font-bold tracking-tighter">ZARKHAM</h1>
+        <h1 class="text-2xl font-bold tracking-tighter">
+          <span class="text-primary">Z</span>AR<span class="text-primary">K</span>HAM
+        </h1>
       </div>
       
-      <nav class="flex gap-6 text-sm font-medium">
-        <a href="/" class="hover:text-primary transition-colors">DASHBOARD</a>
-        <a href="/warden" class="hover:text-primary transition-colors">WARDEN</a>
-        <a href="/seeker" class="hover:text-primary transition-colors">SEEKER</a>
-        <a href="/wallet" class="hover:text-primary transition-colors">WALLET</a>
-      </nav>
+      <!-- Role Switcher -->
+      <div class="relative">
+        <button 
+            class="flex items-center gap-3 bg-card border border-border px-4 py-2 hover:border-primary/50 transition-colors w-48 justify-between"
+            onclick={() => showDropdown = !showDropdown}
+        >
+            <div class="flex items-center gap-2">
+                {#if $activeMode === 'warden'}
+                    <Shield class="w-4 h-4 text-primary" />
+                    <span class="font-bold text-sm tracking-widest">WARDEN</span>
+                {:else}
+                    <Radio class="w-4 h-4 text-primary" />
+                    <span class="font-bold text-sm tracking-widest">SEEKER</span>
+                {/if}
+            </div>
+            <ChevronDown class="w-4 h-4 text-muted-foreground" />
+        </button>
+
+        {#if showDropdown}
+            <div class="absolute top-full right-0 mt-2 w-48 bg-card border border-border shadow-xl z-50 flex flex-col">
+                <button 
+                    class="flex items-center gap-2 px-4 py-3 hover:bg-primary/10 text-left transition-colors {$activeMode === 'warden' ? 'text-primary' : 'text-muted-foreground'}"
+                    onclick={() => switchMode('warden')}
+                >
+                    <Shield class="w-4 h-4" />
+                    <span class="text-sm font-bold">WARDEN</span>
+                </button>
+                <button 
+                    class="flex items-center gap-2 px-4 py-3 hover:bg-primary/10 text-left transition-colors {$activeMode === 'seeker' ? 'text-primary' : 'text-muted-foreground'}"
+                    onclick={() => switchMode('seeker')}
+                >
+                    <Radio class="w-4 h-4" />
+                    <span class="text-sm font-bold">SEEKER</span>
+                </button>
+            </div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="border-t border-border bg-black/50">
+        <div class="container mx-auto px-6 flex gap-8">
+            <button 
+                class="py-3 text-xs font-mono tracking-widest border-b-2 transition-colors {$activeTab === 'overview' ? 'border-primary text-white' : 'border-transparent text-muted-foreground hover:text-white'}"
+                onclick={() => setTab('overview')}
+            >
+                OVERVIEW
+            </button>
+            <button 
+                class="py-3 text-xs font-mono tracking-widest border-b-2 transition-colors {$activeTab === 'wallet' ? 'border-primary text-white' : 'border-transparent text-muted-foreground hover:text-white'}"
+                onclick={() => setTab('wallet')}
+            >
+                WALLET
+            </button>
+            <button 
+                class="py-3 text-xs font-mono tracking-widest border-b-2 transition-colors {$activeTab === 'history' ? 'border-primary text-white' : 'border-transparent text-muted-foreground hover:text-white'}"
+                onclick={() => setTab('history')}
+            >
+                HISTORY
+            </button>
+            <button 
+                class="py-3 text-xs font-mono tracking-widest border-b-2 transition-colors {$activeTab === 'console' ? 'border-primary text-white' : 'border-transparent text-muted-foreground hover:text-white'}"
+                onclick={() => setTab('console')}
+            >
+                CONSOLE
+            </button>
+        </div>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="flex-1 container mx-auto px-4 py-8">
+  <!-- Main Content Area -->
+  <main class="flex-1 container mx-auto px-6 py-8">
     <slot />
   </main>
 
-  <!-- Status Bar / Footer -->
-  <footer class="border-t border-border py-4 bg-card text-xs text-muted-foreground">
-    <div class="container mx-auto px-4 flex justify-between">
+  <!-- Footer -->
+  <footer class="border-t border-border py-4 bg-card text-[10px] uppercase font-mono text-muted-foreground tracking-widest">
+    <div class="container mx-auto px-6 flex justify-between items-center">
       <span>ZARKHAM CORE v1.0.0</span>
-      <div class="flex items-center gap-2">
-        <div class="w-2 h-2 bg-green-500 rounded-none"></div>
-        <span>ONLINE</span>
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2">
+          <Wifi class="w-3 h-3 text-green-500" />
+          <span>NETWORK ONLINE</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <Lock class="w-3 h-3 text-primary" />
+          <span>SECURE UPLINK</span>
+        </div>
       </div>
     </div>
   </footer>

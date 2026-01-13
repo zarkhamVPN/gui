@@ -2,40 +2,75 @@
 
 @theme inline {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    
     --color-background: #000000;
     --color-foreground: #ffffff;
-    
     --color-card: #0a0a0a;
     --color-card-foreground: #ffffff;
-    
     --color-primary: #fed600;
     --color-primary-foreground: #000000;
-    
     --color-secondary: #1a1a1a;
     --color-secondary-foreground: #ffffff;
-    
     --color-muted: #1a1a1a;
     --color-muted-foreground: #888888;
-    
     --color-accent: #fed600;
     --color-accent-foreground: #000000;
-    
     --color-destructive: #cc0000;
     --color-destructive-foreground: #ffffff;
-    
     --color-border: #333333;
     --color-input: #333333;
     --color-ring: #fed600;
-    
-    /* Zero radius for brutalist look */
     --radius: 0px; 
 } 
 
 body {
   @apply bg-background text-foreground font-sans antialiased;
-  background-image: radial-gradient(#222 1px, transparent 1px);
-  background-size: 30px 30px;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Static Starfield Background */
+body::before, body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Layer 1: Tiny White Dots (Fast Blink) */
+body::before {
+  background-image: 
+    radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.3) 0.5px, transparent 0),
+    radial-gradient(circle at 40px 70px, rgba(255, 255, 255, 0.2) 0.5px, transparent 0);
+  background-size: 100px 100px;
+  animation: blink 3.1s infinite step-start;
+}
+
+/* Layer 2: Yellow Dots (Slow Pulse) */
+body::after {
+  background-image: 
+    radial-gradient(circle at 60px 20px, rgba(254, 214, 0, 0.4) 1px, transparent 0),
+    radial-gradient(circle at 15px 85px, rgba(254, 214, 0, 0.3) 1px, transparent 0);
+  background-size: 130px 130px;
+  animation: blink 5.7s infinite step-end;
+}
+
+/* Added a 3rd layer for extra depth/randomness */
+.star-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image: 
+    radial-gradient(circle at 80px 50px, rgba(255, 255, 255, 0.2) 0.8px, transparent 0);
+  background-size: 170px 170px;
+  animation: blink 7.3s infinite linear;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.1; }
+  10%, 90% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 /* Spotlight Effect Utility */
