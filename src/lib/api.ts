@@ -85,11 +85,11 @@ export async function disconnectWarden(profile: string, wardenAuthority: string)
 
 // --- Node / P2P API ---
 
-export async function manualConnect(multiaddr: string) {
+export async function manualConnect(multiaddr: string, estimatedMb?: number) {
     const res = await fetch(`${API_BASE}/node/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ multiaddr })
+        body: JSON.stringify({ multiaddr, estimatedMb })
     });
     if (!res.ok) throw new Error(await res.text());
     return await res.json();

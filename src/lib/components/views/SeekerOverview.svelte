@@ -3,27 +3,34 @@
     import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
     import BracketCard from "$lib/components/ui/BracketCard.svelte";
     import Loading from "$lib/components/ui/Loading.svelte";
+    import DirectConnectModal from "$lib/components/views/DirectConnectModal.svelte";
     import { getAllWardens, connectToWarden, getSeekerStatus, manualConnect, disconnectWarden } from "$lib/api";
     import { addToast } from "$lib/stores/toast";
     import { Wifi, ShieldCheck, Zap, Lock, Network, Activity } from "lucide-svelte";
 
     let wardens: any[] = [];
     let loading = true;
+    let wardensLoading = true;
     let isConnected = false;
     let connection: any = null;
     let manualAddr = "";
+    let showDirectConnectModal = false;
 
-    onMount(refresh);
+    onMount(() => {
+        refreshStatus();
+        loadWardens();
+    });
 
     async function refresh() {
-        loading = true;
+        await Promise.all([refreshStatus(), loadWardens()]);
+    }
+
+    async function refreshStatus() {
         try {
             const status = await getSeekerStatus("seeker");
             if (status.connectedWardenPDA) {
                 isConnected = true;
                 connection = status;
-            } else {
-                wardens = await getAllWardens();
             }
         } catch (e) {
             console.error(e);
@@ -32,15 +39,23 @@
         }
     }
 
-    async function handleManualConnect() {
+    async function loadWardens() {
+        wardensLoading = true;
         try {
-            await manualConnect(manualAddr);
-            addToast("Connection Initiated", "info");
-            manualAddr = "";
-            // In a real app we'd poll for success, here we assume optimism
+            wardens = await getAllWardens();
         } catch (e) {
-            addToast("Connection Failed: " + e, "error");
+            console.error(e);
+        } finally {
+            wardensLoading = false;
         }
+    }
+
+    function handleManualConnect() {
+        if (!manualAddr) {
+            addToast("Please enter a multiaddress", "error");
+            return;
+        }
+        showDirectConnectModal = true;
     }
 
     async function handleDisconnect() {
@@ -181,5 +196,15 @@
                 </div>
             {/if}
         {/if}
+    {/if}
+
+    {#if showDirectConnectModal}
+        <DirectConnectModal 
+            multiaddr={manualAddr} 
+            onclose={() => {
+                showDirectConnectModal = false;
+                refresh();
+            }} 
+        />
     {/if}
 </div>
