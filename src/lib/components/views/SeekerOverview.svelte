@@ -72,129 +72,147 @@
 </script>
 
 <div class="space-y-8">
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold uppercase tracking-tighter">Seeker Uplink</h2>
+            <p class="text-sm text-muted-foreground">Secure tunnel management.</p>
+        </div>
+        {#if isConnected}
+            <div class="flex items-center gap-2 text-green-500 border border-green-500/30 bg-green-500/10 px-4 py-2 text-xs font-bold animate-pulse">
+                <Lock class="w-3 h-3" /> ENCRYPTED
+            </div>
+        {/if}
+    </div>
+
     {#if loading}
-        <div class="h-[60vh] flex items-center justify-center">
+        <div class="h-[200px] flex items-center justify-center">
             <Loading />
         </div>
-    {:else}
-        <div class="flex justify-between items-center">
-            <div>
-                <h2 class="text-3xl font-bold uppercase tracking-tighter">Seeker Uplink</h2>
-                <p class="text-sm text-muted-foreground">Secure tunnel management.</p>
-            </div>
-            {#if isConnected}
-                <div class="flex items-center gap-2 text-green-500 border border-green-500/30 bg-green-500/10 px-4 py-2 text-xs font-bold animate-pulse">
-                    <Lock class="w-3 h-3" /> ENCRYPTED
+    {:else if isConnected}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BracketCard>
+                <div class="flex justify-between mb-6">
+                    <span class="text-xs font-mono text-muted-foreground">STATUS</span>
+                    <Activity class="w-5 h-5 text-green-500" />
                 </div>
-            {/if}
+                <div class="text-5xl font-bold text-white mb-2">CONNECTED</div>
+                <p class="text-sm text-muted-foreground font-mono">
+                    Tunnel established via WireGuard.<br>
+                    Traffic routed through Warden node.
+                </p>
+                <button 
+                    class="mt-8 w-full border border-red-500/50 text-red-500 font-bold py-3 hover:bg-red-500/10 transition-colors"
+                    onclick={handleDisconnect}
+                >
+                    TERMINATE
+                </button>
+            </BracketCard>
+
+            <BracketCard>
+                <div class="flex justify-between mb-6">
+                    <span class="text-xs font-mono text-muted-foreground">METRICS</span>
+                    <Zap class="w-5 h-5 text-primary" />
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>BANDWIDTH</span>
+                            <span>12.4 MB</span>
+                        </div>
+                        <div class="h-1 bg-secondary w-full">
+                            <div class="h-full bg-primary w-[12%]"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>LATENCY</span>
+                            <span>45ms</span>
+                        </div>
+                        <div class="h-1 bg-secondary w-full">
+                            <div class="h-full bg-green-500 w-[20%]"></div>
+                        </div>
+                    </div>
+                </div>
+            </BracketCard>
+        </div>
+    {:else}
+        <!-- Manual Connect -->
+        <div class="border border-border bg-card/50 p-6 flex flex-col md:flex-row gap-4 items-end">
+            <div class="flex-1 w-full">
+                <label class="block text-[10px] font-mono text-muted-foreground mb-2 flex items-center gap-2">
+                    <Network class="w-3 h-3" /> MANUAL PEER CONNECT
+                </label>
+                <input 
+                    type="text" 
+                    bind:value={manualAddr}
+                    placeholder="Warden Multiaddr..."
+                    class="w-full bg-black border border-border p-3 text-sm focus:border-primary outline-none text-white font-mono placeholder:text-muted-foreground/30"
+                />
+            </div>
+            <button 
+                class="bg-white/10 text-white px-6 py-3 text-sm font-bold border border-white/20 hover:bg-white/20 transition-colors"
+                onclick={handleManualConnect}
+            >
+                DIRECT CONNECT
+            </button>
         </div>
 
-        {#if isConnected}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <BracketCard>
-                    <div class="flex justify-between mb-6">
-                        <span class="text-xs font-mono text-muted-foreground">STATUS</span>
-                        <Activity class="w-5 h-5 text-green-500" />
-                    </div>
-                    <div class="text-5xl font-bold text-white mb-2">CONNECTED</div>
-                    <p class="text-sm text-muted-foreground font-mono">
-                        Tunnel established via WireGuard.<br>
-                        Traffic routed through Warden node.
-                    </p>
-                    <button 
-                        class="mt-8 w-full border border-red-500/50 text-red-500 font-bold py-3 hover:bg-red-500/10 transition-colors"
-                        onclick={handleDisconnect}
-                    >
-                        TERMINATE
-                    </button>
-                </BracketCard>
-
-                <BracketCard>
-                    <div class="flex justify-between mb-6">
-                        <span class="text-xs font-mono text-muted-foreground">METRICS</span>
-                        <Zap class="w-5 h-5 text-primary" />
-                    </div>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span>BANDWIDTH</span>
-                                <span>12.4 MB</span>
+        <!-- Node Grid -->
+        {#if wardensLoading}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {#each {length: 6} as _}
+                    <SpotlightCard>
+                        <div class="animate-pulse space-y-4">
+                            <div class="flex justify-between">
+                                <div class="h-4 w-16 bg-muted/20 rounded"></div>
+                                <div class="h-4 w-4 bg-muted/20 rounded-full"></div>
                             </div>
-                            <div class="h-1 bg-secondary w-full">
-                                <div class="h-full bg-primary w-[12%]"></div>
+                            <div class="h-6 w-3/4 bg-muted/20 rounded"></div>
+                            <div class="h-3 w-full bg-muted/20 rounded"></div>
+                            <div class="h-3 w-1/2 bg-muted/20 rounded"></div>
+                            <div class="pt-4 flex justify-between items-center">
+                                <div class="h-4 w-12 bg-muted/20 rounded"></div>
+                                <div class="h-8 w-20 bg-muted/20 rounded"></div>
                             </div>
                         </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span>LATENCY</span>
-                                <span>45ms</span>
-                            </div>
-                            <div class="h-1 bg-secondary w-full">
-                                <div class="h-full bg-green-500 w-[20%]"></div>
-                            </div>
-                        </div>
-                    </div>
-                </BracketCard>
+                    </SpotlightCard>
+                {/each}
+            </div>
+        {:else if wardens.length === 0}
+            <div class="h-48 flex flex-col items-center justify-center border border-dashed border-border opacity-50">
+                <Wifi class="w-8 h-8 mb-2" />
+                <span class="text-xs font-mono">NO PUBLIC NODES DETECTED</span>
             </div>
         {:else}
-            <!-- Manual Connect -->
-            <div class="border border-border bg-card/50 p-6 flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-1 w-full">
-                    <label class="block text-[10px] font-mono text-muted-foreground mb-2 flex items-center gap-2">
-                        <Network class="w-3 h-3" /> MANUAL PEER CONNECT
-                    </label>
-                    <input 
-                        type="text" 
-                        bind:value={manualAddr}
-                        placeholder="Warden Multiaddr..."
-                        class="w-full bg-black border border-border p-3 text-sm focus:border-primary outline-none text-white font-mono placeholder:text-muted-foreground/30"
-                    />
-                </div>
-                <button 
-                    class="bg-white/10 text-white px-6 py-3 text-sm font-bold border border-white/20 hover:bg-white/20 transition-colors"
-                    onclick={handleManualConnect}
-                >
-                    DIRECT CONNECT
-                </button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {#each wardens as warden}
+                    <SpotlightCard>
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="font-mono text-[10px] bg-primary/10 text-primary px-2 py-1 border border-primary/20">
+                                {warden.location}
+                            </div>
+                            <ShieldCheck class="w-4 h-4 text-green-500" />
+                        </div>
+                        <p class="font-bold truncate">{warden.nickname}</p>
+                        <p class="text-[10px] font-mono text-muted-foreground break-all mb-4">{warden.authority}</p>
+                        
+                                                <div class="flex justify-between items-center border-t border-border pt-4 mt-auto">
+                        
+                                                    <span class="text-xs text-primary font-bold">${(warden.price || 0).toFixed(4)}/GB</span>
+                        
+                                                    <button 
+                        
+                                                        class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors"
+                        
+                        
+                                onclick={() => connectToWarden("seeker", warden.authority, warden.id, 100)}
+                            >
+                                CONNECT
+                            </button>
+                        </div>
+                    </SpotlightCard>
+                {/each}
             </div>
-
-            <!-- Node Grid -->
-            {#if wardens.length === 0}
-                <div class="h-48 flex flex-col items-center justify-center border border-dashed border-border opacity-50">
-                    <Wifi class="w-8 h-8 mb-2" />
-                    <span class="text-xs font-mono">NO PUBLIC NODES DETECTED</span>
-                </div>
-            {:else}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {#each wardens as warden}
-                        <SpotlightCard>
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="font-mono text-[10px] bg-primary/10 text-primary px-2 py-1 border border-primary/20">
-                                    {warden.location}
-                                </div>
-                                <ShieldCheck class="w-4 h-4 text-green-500" />
-                            </div>
-                            <p class="font-bold truncate">{warden.nickname}</p>
-                            <p class="text-[10px] font-mono text-muted-foreground break-all mb-4">{warden.authority}</p>
-                            
-                                                    <div class="flex justify-between items-center border-t border-border pt-4 mt-auto">
-                            
-                                                        <span class="text-xs text-primary font-bold">${(warden.price || 0).toFixed(4)}/GB</span>
-                            
-                                                        <button 
-                            
-                                                            class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors"
-                            
-                            
-                                    onclick={() => connectToWarden("seeker", warden.authority, warden.id, 100)}
-                                >
-                                    CONNECT
-                                </button>
-                            </div>
-                        </SpotlightCard>
-                    {/each}
-                </div>
-            {/if}
         {/if}
     {/if}
 
