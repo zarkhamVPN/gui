@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
-  import { getWardenStatus, checkWardenCorruption, migrateWarden, registerWarden } from "$lib/api";
-  import { Shield, Zap, AlertTriangle, CheckCircle, Server } from "lucide-svelte";
+  import { getWardenStatus, checkWardenCorruption, migrateWarden, registerWarden, getNodeStatus } from "$lib/api";
+  import { Shield, Zap, AlertTriangle, CheckCircle, Server, Copy } from "lucide-svelte";
 
   let loading = true;
   let isRegistered = false;
   let wardenData: any = null;
+  let nodeStatus: any = null;
   let corruptionStatus: any = null;
   let showRegisterModal = false;
 
@@ -25,6 +26,7 @@
     const status = await getWardenStatus(PROFILE);
     isRegistered = status.is_registered;
     wardenData = status.warden;
+    nodeStatus = await getNodeStatus();
 
     if (isRegistered) {
         corruptionStatus = await checkWardenCorruption(PROFILE);
@@ -46,6 +48,18 @@
       if (confirm("This will attempt to fix account data serialization issues. Continue?")) {
           await migrateWarden(PROFILE);
           await loadData();
+      }
+  }
+  
+  let copyText = "Copy";
+  async function copyMultiaddr() {
+      if(!nodeStatus?.p2pMultiaddr) return;
+      try {
+          await navigator.clipboard.writeText(nodeStatus.p2pMultiaddr);
+          copyText = "Copied!";
+          setTimeout(() => copyText = "Copy", 2000);
+      } catch (err) {
+          console.error('Failed to copy: ', err);
       }
   }
 </script>
@@ -86,36 +100,55 @@
   {:else}
     <!-- Dashboard Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Earnings -->
-        <SpotlightCard>
-            <div class="flex justify-between mb-4">
-                <span class="text-xs font-mono text-muted-foreground">TOTAL EARNINGS</span>
-                <Zap class="w-5 h-5 text-primary" />
-            </div>
-            <div class="text-4xl font-bold text-primary">
-                {(wardenData.totalEarnings / 1e9).toFixed(4)} <span class="text-lg text-white">SOL</span>
-            </div>
-            <p class="text-xs text-muted-foreground mt-2">
-                Pending: {(wardenData.pendingClaims / 1e9).toFixed(4)} SOL
-            </p>
-        </SpotlightCard>
+        <!-- Left Column -->
+        <div class="md:col-span-2 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <!-- Earnings -->
+                <SpotlightCard>
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-mono text-muted-foreground">TOTAL EARNINGS</span>
+                        <Zap class="w-5 h-5 text-primary" />
+                    </div>
+                    <div class="text-4xl font-bold text-primary">
+                        {(wardenData.totalEarnings / 1e9).toFixed(4)} <span class="text-lg text-white">SOL</span>
+                    </div>
+                    <p class="text-xs text-muted-foreground mt-2">
+                        Pending: {(wardenData.pendingClaims / 1e9).toFixed(4)} SOL
+                    </p>
+                </SpotlightCard>
 
-        <!-- Bandwidth -->
-        <SpotlightCard>
-            <div class="flex justify-between mb-4">
-                <span class="text-xs font-mono text-muted-foreground">DATA RELAYED</span>
-                <Server class="w-5 h-5 text-primary" />
+                <!-- Bandwidth -->
+                <SpotlightCard>
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-mono text-muted-foreground">DATA RELAYED</span>
+                        <Server class="w-5 h-5 text-primary" />
+                    </div>
+                    <div class="text-4xl font-bold text-white">
+                        {(wardenData.totalBandwidthServed / 1024).toFixed(2)} <span class="text-lg text-muted-foreground">GB</span>
+                    </div>
+                    <div class="mt-4 flex gap-2 text-xs font-mono">
+                        <span class="bg-card border border-border px-2 py-1">UP: 99.9%</span>
+                        <span class="bg-card border border-border px-2 py-1">CONN: {wardenData.activeConnections}</span>
+                    </div>
+                </SpotlightCard>
             </div>
-            <div class="text-4xl font-bold text-white">
-                {(wardenData.totalBandwidthServed / 1024).toFixed(2)} <span class="text-lg text-muted-foreground">GB</span>
-            </div>
-            <div class="mt-4 flex gap-2 text-xs font-mono">
-                <span class="bg-card border border-border px-2 py-1">UP: 99.9%</span>
-                <span class="bg-card border border-border px-2 py-1">CONN: {wardenData.activeConnections}</span>
-            </div>
-        </SpotlightCard>
+             <!-- Multiaddr Display -->
+            <SpotlightCard>
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-xs font-mono text-muted-foreground">DIRECT CONNECT</span>
+                     <button class="flex items-center gap-2 text-xs hover:text-primary transition-colors" onclick={copyMultiaddr}>
+                        <Copy class="w-3 h-3" /> {copyText}
+                    </button>
+                </div>
+                <div class="p-3 bg-background border border-border font-mono text-xs break-all">
+                    {nodeStatus?.p2pMultiaddr || 'Not available'}
+                </div>
+                <p class="text-[10px] text-muted-foreground mt-2">Share this multiaddr with Seekers for direct connection.</p>
+            </SpotlightCard>
+        </div>
+       
 
-        <!-- Health / Config -->
+        <!-- Right Column (Health) -->
         <SpotlightCard>
             <div class="flex justify-between mb-4">
                 <span class="text-xs font-mono text-muted-foreground">SYSTEM HEALTH</span>

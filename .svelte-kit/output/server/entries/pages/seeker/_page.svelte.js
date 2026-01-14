@@ -63,7 +63,7 @@ function _page($$renderer, $$props) {
       $$renderer2.push("<!--[!-->");
       $$renderer2.push(`<div class="bg-card border border-border p-6 flex flex-col md:flex-row gap-4 items-end"><div class="flex-1 w-full"><label class="block text-xs font-mono text-muted-foreground mb-2 flex items-center gap-2">`);
       Network($$renderer2, { class: "w-3 h-3" });
-      $$renderer2.push(`<!----> MANUAL PEER CONNECT</label> <input type="text"${attr("value", manualMultiaddr)} placeholder="/ip4/127.0.0.1/udp/4001/quic-v1/p2p/..." class="w-full bg-background border border-border p-3 text-sm focus:border-primary outline-none text-white font-mono"/></div> <button class="bg-secondary text-white px-6 py-3 font-bold hover:bg-white/10 transition-colors border border-border w-full md:w-auto"${attr("disabled", manualConnecting, true)}>${escape_html("DIRECT CONNECT")}</button></div> `);
+      $$renderer2.push(`<!----> MANUAL PEER CONNECT</label> <input type="text"${attr("value", manualMultiaddr)} placeholder="Warden Peer ID..." class="w-full bg-background border border-border p-3 text-sm focus:border-primary outline-none text-white font-mono"/></div> <button class="bg-secondary text-white px-6 py-3 font-bold hover:bg-white/10 transition-colors border border-border w-full md:w-auto"${attr("disabled", manualConnecting, true)}>${escape_html("DIRECT CONNECT")}</button></div> `);
       {
         $$renderer2.push("<!--[-->");
         $$renderer2.push(`<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><!--[-->`);
