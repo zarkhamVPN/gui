@@ -11,6 +11,7 @@
     let isRegistered = false;
     let isRunning = false;
     let stats: any = null;
+    let nodeStatus: any = null;
     let balance = 0;
     let loading = true;
     let showRegisterModal = false;
@@ -26,6 +27,7 @@
         loading = true;
         try {
             const nStatus = await getNodeStatus();
+            nodeStatus = nStatus;
             isRunning = nStatus.isRunning;
 
             const wStatus = await getWardenStatus("warden");
@@ -71,6 +73,13 @@
         if (stats?.peerId) {
             navigator.clipboard.writeText(stats.peerId);
             addToast("Peer ID copied", "info");
+        }
+    }
+
+    function copyMultiaddr() {
+        if (nodeStatus?.p2pMultiaddr) {
+            navigator.clipboard.writeText(nodeStatus.p2pMultiaddr);
+            addToast("Multiaddr copied", "info");
         }
     }
 
@@ -198,10 +207,19 @@
 
                 <SpotlightCard>
                     <div class="flex justify-between items-center mb-4">
-                        <span class="text-xs font-mono text-muted-foreground uppercase tracking-widest">Bandwidth Served</span>
+                        <span class="text-xs font-mono text-muted-foreground uppercase tracking-widest">Direct Connect</span>
                         <Server class="w-4 h-4 text-primary" />
                     </div>
-                    <div class="text-4xl font-bold">{(stats?.totalBandwidthServed / 1024).toFixed(2)} <span class="text-lg text-muted-foreground">GB</span></div>
+                    <div class="flex items-center justify-between bg-black border border-border p-3 group hover:border-primary/30 transition-colors">
+                        <span class="text-xs font-mono text-muted-foreground truncate w-full mr-2">{nodeStatus?.p2pMultiaddr || 'Not available'}</span>
+                        <button class="text-muted-foreground hover:text-primary transition-colors" onclick={copyMultiaddr} title="Copy Multiaddr">
+                            <Copy class="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div class="mt-2 text-xs flex justify-between uppercase font-mono tracking-widest">
+                        <span class="text-muted-foreground">Bandwidth Served</span>
+                        <span class="text-white font-bold">{(stats?.totalBandwidthServed / 1024).toFixed(2)} GB</span>
+                    </div>
                 </SpotlightCard>
             </div>
 

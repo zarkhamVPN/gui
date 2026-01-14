@@ -131,7 +131,7 @@
                     <input 
                         type="text" 
                         bind:value={manualAddr}
-                        placeholder="/ip4/1.2.3.4/udp/4001/quic-v1/p2p/..."
+                        placeholder="Warden Multiaddr..."
                         class="w-full bg-black border border-border p-3 text-sm focus:border-primary outline-none text-white font-mono placeholder:text-muted-foreground/30"
                     />
                 </div>
