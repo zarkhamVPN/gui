@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
     import BracketCard from "$lib/components/ui/BracketCard.svelte";
     import Loading from "$lib/components/ui/Loading.svelte";
     import DirectConnectModal from "$lib/components/views/DirectConnectModal.svelte";
     import { getAllWardens, connectToWarden, getSeekerStatus, manualConnect, disconnectWarden } from "$lib/api";
     import { addToast } from "$lib/stores/toast";
-    import { Wifi, ShieldCheck, Zap, Lock, Network, Activity } from "lucide-svelte";
+    import { Wifi, ShieldCheck, Zap, Lock, Network, Activity, Power } from "lucide-svelte";
 
     let wardens: any[] = [];
     let loading = true;
@@ -15,11 +15,28 @@
     let connection: any = null;
     let manualAddr = "";
     let showDirectConnectModal = false;
+    let solPrice = 150;
+    let latency = 0;
+    let latencyInterval: any;
 
     onMount(() => {
         refreshStatus();
         loadWardens();
+        fetchSolPrice();
+        latencyInterval = setInterval(refreshLatency, 5000);
     });
+
+    onDestroy(() => {
+        if (latencyInterval) clearInterval(latencyInterval);
+    });
+
+    async function fetchSolPrice() {
+        try {
+            const pRes = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+            const pData = await pRes.json();
+            solPrice = pData.solana.usd;
+        } catch { /* fallback exists */ }
+    }
 
     async function refresh() {
         await Promise.all([refreshStatus(), loadWardens()]);
@@ -28,15 +45,26 @@
     async function refreshStatus() {
         try {
             const status = await getSeekerStatus("seeker");
-            if (status.connectedWardenPDA) {
+            if (status.seeker && status.seeker.connectedWardenPDA) {
                 isConnected = true;
-                connection = status;
+                connection = status.seeker;
+                refreshLatency(); // Initial fetch
             }
         } catch (e) {
             console.error(e);
         } finally {
             loading = false;
         }
+    }
+
+    async function refreshLatency() {
+        if (!isConnected) return;
+        try {
+            const res = await fetch("/api/node/latency");
+            if (res.ok) {
+                latency = await res.json();
+            }
+        } catch { /* ignore */ }
     }
 
     async function loadWardens() {
@@ -71,17 +99,32 @@
     }
 </script>
 
-<div class="space-y-8">
+{#if isConnected}
+    <!-- Immersive Connected State -->
+    <div class="fixed inset-0 pointer-events-none z-40 border-[6px] border-green-500/50 animate-pulse shadow-[inset_0_0_50px_rgba(34,197,94,0.2)]"></div>
+    
+    <div class="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-black/90 backdrop-blur border-2 border-green-500 px-6 py-3 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+        <div class="flex items-center gap-2 text-green-500 font-bold tracking-widest">
+            <Lock class="w-4 h-4" />
+            SECURE UPLINK ACTIVE
+        </div>
+        <div class="h-4 w-px bg-green-500/30"></div>
+        <button 
+            class="text-red-500 hover:text-red-400 transition-colors p-1 hover:bg-red-500/10"
+            onclick={handleDisconnect}
+            title="Terminate Connection"
+        >
+            <Power class="w-5 h-5" />
+        </button>
+    </div>
+{/if}
+
+<div class="space-y-8 relative z-10">
     <div class="flex justify-between items-center">
         <div>
             <h2 class="text-3xl font-bold uppercase tracking-tighter">Seeker Uplink</h2>
             <p class="text-sm text-muted-foreground">Secure tunnel management.</p>
         </div>
-        {#if isConnected}
-            <div class="flex items-center gap-2 text-green-500 border border-green-500/30 bg-green-500/10 px-4 py-2 text-xs font-bold animate-pulse">
-                <Lock class="w-3 h-3" /> ENCRYPTED
-            </div>
-        {/if}
     </div>
 
     {#if loading}
@@ -89,7 +132,7 @@
             <Loading />
         </div>
     {:else if isConnected}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
             <BracketCard>
                 <div class="flex justify-between mb-6">
                     <span class="text-xs font-mono text-muted-foreground">STATUS</span>
@@ -100,12 +143,10 @@
                     Tunnel established via WireGuard.<br>
                     Traffic routed through Warden node.
                 </p>
-                <button 
-                    class="mt-8 w-full border border-red-500/50 text-red-500 font-bold py-3 hover:bg-red-500/10 transition-colors"
-                    onclick={handleDisconnect}
-                >
-                    TERMINATE
-                </button>
+                <div class="mt-8 p-4 bg-green-500/5 border border-green-500/20 rounded">
+                    <div class="text-xs text-green-400 font-mono mb-1">ENCRYPTION</div>
+                    <div class="text-lg font-bold text-white">ChaCha20-Poly1305</div>
+                </div>
             </BracketCard>
 
             <BracketCard>
@@ -126,10 +167,10 @@
                     <div>
                         <div class="flex justify-between text-xs mb-1">
                             <span>LATENCY</span>
-                            <span>45ms</span>
+                            <span>{latency > 0 ? latency + "ms" : "Calculating..."}</span>
                         </div>
                         <div class="h-1 bg-secondary w-full">
-                            <div class="h-full bg-green-500 w-[20%]"></div>
+                            <div class="h-full bg-green-500 transition-all duration-500" style="width: {Math.min(100, (1000/Math.max(1, latency))*10)}%"></div>
                         </div>
                     </div>
                 </div>
@@ -198,14 +239,17 @@
                         
                                                 <div class="flex justify-between items-center border-t border-border pt-4 mt-auto">
                         
-                                                    <span class="text-xs text-primary font-bold">${(warden.price || 0).toFixed(4)}/GB</span>
+                                                    <span class="text-xs text-primary font-bold">
+                                                        ${((warden.price / 1e9) * solPrice * 1024).toFixed(4)}/GB
+                                                    </span>
                         
                                                     <button 
                         
-                                                        class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors"
+                                                        class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         
                         
                                 onclick={() => connectToWarden("seeker", warden.authority, warden.id, 100)}
+                                disabled={isConnected}
                             >
                                 CONNECT
                             </button>
