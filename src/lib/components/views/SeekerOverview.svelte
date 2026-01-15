@@ -6,29 +6,47 @@
     import DirectConnectModal from "$lib/components/views/DirectConnectModal.svelte";
     import { getAllWardens, connectToWarden, getSeekerStatus, manualConnect, disconnectWarden } from "$lib/api";
     import { addToast } from "$lib/stores/toast";
-    import { Wifi, ShieldCheck, Zap, Lock, Network, Activity, Power } from "lucide-svelte";
+    import { Wifi, ShieldCheck, Zap, Lock, Network, Activity, Power, RefreshCw } from "lucide-svelte";
 
     let wardens: any[] = [];
     let loading = true;
     let wardensLoading = true;
     let isConnected = false;
+    let isLocalLinkActive = false;
+    let isDisconnecting = false;
     let connection: any = null;
     let manualAddr = "";
     let showDirectConnectModal = false;
     let solPrice = 150;
     let latency = 0;
+    let bandwidth = 0; // Total bytes (Tx+Rx)
     let latencyInterval: any;
+    let bandwidthInterval: any;
+    let statusInterval: any;
 
     onMount(() => {
         refreshStatus();
         loadWardens();
         fetchSolPrice();
-        latencyInterval = setInterval(refreshLatency, 5000);
+        startPolling();
     });
 
     onDestroy(() => {
-        if (latencyInterval) clearInterval(latencyInterval);
+        stopPolling();
     });
+
+    function startPolling() {
+        stopPolling();
+        latencyInterval = setInterval(refreshLatency, 5000);
+        bandwidthInterval = setInterval(refreshBandwidth, 2000);
+        statusInterval = setInterval(refreshStatus, 2000);
+    }
+
+    function stopPolling() {
+        if (latencyInterval) clearInterval(latencyInterval);
+        if (bandwidthInterval) clearInterval(bandwidthInterval);
+        if (statusInterval) clearInterval(statusInterval);
+    }
 
     async function fetchSolPrice() {
         try {
@@ -45,10 +63,23 @@
     async function refreshStatus() {
         try {
             const status = await getSeekerStatus("seeker");
-            if (status.seeker && status.seeker.connectedWardenPDA) {
-                isConnected = true;
-                connection = status.seeker;
-                refreshLatency(); // Initial fetch
+            isDisconnecting = status.isDisconnecting;
+            
+            // CORRECT MAPPING: isLocalLinkActive is inside status.seeker
+            if (status.seeker) {
+                isLocalLinkActive = status.seeker.isLocalLinkActive;
+                
+                if (status.seeker.connectedWardenPDA) {
+                    isConnected = true;
+                    connection = status.seeker;
+                    // Backup authority to localStorage for robust disconnects
+                    if (status.seeker.connectedWardenAuthority) {
+                        localStorage.setItem("last_warden_auth", status.seeker.connectedWardenAuthority);
+                    }
+                } else {
+                    isConnected = false;
+                    connection = null;
+                }
             }
         } catch (e) {
             console.error(e);
@@ -58,13 +89,31 @@
     }
 
     async function refreshLatency() {
-        if (!isConnected) return;
+        if (!isConnected || !isLocalLinkActive) return;
         try {
             const res = await fetch("/api/node/latency");
             if (res.ok) {
                 latency = await res.json();
             }
         } catch { /* ignore */ }
+    }
+
+    async function refreshBandwidth() {
+        if (!isConnected || !isLocalLinkActive) return;
+        try {
+            const res = await fetch("/api/node/bandwidth");
+            if (res.ok) {
+                bandwidth = await res.json();
+            }
+        } catch { /* ignore */ }
+    }
+
+    function formatBandwidth(bytes: number) {
+        if (bytes === 0) return "0.00 B";
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     async function loadWardens() {
@@ -88,34 +137,54 @@
 
     async function handleDisconnect() {
         try {
-            await disconnectWarden("seeker", connection.connectedWardenAuthority);
+            stopPolling();
+            const auth = connection?.connectedWardenAuthority || localStorage.getItem("last_warden_auth") || "";
+            
+            // Optimistic update
+            isDisconnecting = true;
             isConnected = false;
             connection = null;
+            
+            await disconnectWarden("seeker", auth);
             addToast("Link Terminated", "info");
-            await refresh();
+            localStorage.removeItem("last_warden_auth");
+            
+            setTimeout(() => {
+                startPolling();
+                refresh();
+            }, 10000);
+            
         } catch (e) {
             addToast("Disconnect Failed", "error");
+            startPolling();
         }
     }
 </script>
 
-{#if isConnected}
-    <!-- Immersive Connected State -->
-    <div class="fixed inset-0 pointer-events-none z-40 border-[6px] border-green-500/50 animate-pulse shadow-[inset_0_0_50px_rgba(34,197,94,0.2)]"></div>
+{#if isConnected || isDisconnecting}
+    <!-- Immersive Connected/Disconnecting State -->
+    <div class="fixed inset-0 pointer-events-none z-40 border-[6px] {isDisconnecting ? 'border-yellow-500/50' : 'border-green-500/50'} animate-pulse shadow-[inset_0_0_50px_rgba(34,197,94,0.2)]"></div>
     
-    <div class="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-black/90 backdrop-blur border-2 border-green-500 px-6 py-3 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
-        <div class="flex items-center gap-2 text-green-500 font-bold tracking-widest">
-            <Lock class="w-4 h-4" />
-            SECURE UPLINK ACTIVE
+    <div class="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-black/90 backdrop-blur border-2 {isDisconnecting ? 'border-yellow-500' : 'border-green-500'} px-6 py-3 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+        <div class="flex items-center gap-2 {isDisconnecting ? 'text-yellow-500' : 'text-green-500'} font-bold tracking-widest uppercase">
+            {#if isDisconnecting}
+                <RefreshCw class="w-4 h-4 animate-spin" />
+                Disconnecting in progress...
+            {:else}
+                <Lock class="w-4 h-4" />
+                Secure Uplink Active
+            {/if}
         </div>
-        <div class="h-4 w-px bg-green-500/30"></div>
-        <button 
-            class="text-red-500 hover:text-red-400 transition-colors p-1 hover:bg-red-500/10"
-            onclick={handleDisconnect}
-            title="Terminate Connection"
-        >
-            <Power class="w-5 h-5" />
-        </button>
+        {#if !isDisconnecting}
+            <div class="h-4 w-px bg-green-500/30"></div>
+            <button 
+                class="text-red-500 hover:text-red-400 transition-colors p-1 hover:bg-red-500/10"
+                onclick={handleDisconnect}
+                title="Terminate Connection"
+            >
+                <Power class="w-5 h-5" />
+            </button>
+        {/if}
     </div>
 {/if}
 
@@ -131,46 +200,62 @@
         <div class="h-[200px] flex items-center justify-center">
             <Loading />
         </div>
-    {:else if isConnected}
+    {:else if isConnected || isDisconnecting}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
             <BracketCard>
                 <div class="flex justify-between mb-6">
-                    <span class="text-xs font-mono text-muted-foreground">STATUS</span>
-                    <Activity class="w-5 h-5 text-green-500" />
+                    <span class="text-xs font-mono text-muted-foreground uppercase tracking-widest">On-Chain Session</span>
+                    <Activity class="w-5 h-5 {isLocalLinkActive ? 'text-green-500' : 'text-yellow-500'}" />
                 </div>
-                <div class="text-5xl font-bold text-white mb-2">CONNECTED</div>
-                <p class="text-sm text-muted-foreground font-mono">
-                    Tunnel established via WireGuard.<br>
-                    Traffic routed through Warden node.
-                </p>
-                <div class="mt-8 p-4 bg-green-500/5 border border-green-500/20 rounded">
-                    <div class="text-xs text-green-400 font-mono mb-1">ENCRYPTION</div>
+                
+                {#if isLocalLinkActive}
+                    <div class="text-5xl font-bold text-white mb-2 uppercase tracking-tighter">Connected</div>
+                    <p class="text-sm text-muted-foreground font-mono">
+                        Tunnel established via WireGuard.<br>
+                        Traffic routed through Warden node.
+                    </p>
+                {:else if isDisconnecting}
+                    <div class="text-5xl font-bold text-yellow-500 mb-2 uppercase tracking-tighter">Closing</div>
+                    <p class="text-sm text-yellow-500/70 font-mono italic">
+                        Finalizing bandwidth proofs on-chain.<br>
+                        Tearing down encrypted tunnel.
+                    </p>
+                {:else}
+                    <div class="text-5xl font-bold text-yellow-500 mb-2 uppercase tracking-tighter">Lingering</div>
+                    <p class="text-sm text-yellow-500/70 font-mono italic">
+                        Local link is down, but on-chain session is still active.<br>
+                        Terminate to stop billing.
+                    </p>
+                {/if}
+
+                <div class="mt-8 p-4 {isLocalLinkActive ? 'bg-green-500/5 border-green-500/20' : 'bg-yellow-500/5 border-yellow-500/20'} border rounded">
+                    <div class="text-xs {isLocalLinkActive ? 'text-green-400' : 'text-yellow-400'} font-mono mb-1 uppercase tracking-tighter">Encryption & Integrity</div>
                     <div class="text-lg font-bold text-white">ChaCha20-Poly1305</div>
                 </div>
             </BracketCard>
 
             <BracketCard>
                 <div class="flex justify-between mb-6">
-                    <span class="text-xs font-mono text-muted-foreground">METRICS</span>
+                    <span class="text-xs font-mono text-muted-foreground uppercase tracking-widest">Live Metrics</span>
                     <Zap class="w-5 h-5 text-primary" />
                 </div>
                 <div class="space-y-4">
                     <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span>BANDWIDTH</span>
-                            <span>12.4 MB</span>
+                        <div class="flex justify-between text-xs mb-1 uppercase font-mono">
+                            <span>Relayed Data</span>
+                            <span class="text-primary font-bold">{formatBandwidth(bandwidth)}</span>
                         </div>
                         <div class="h-1 bg-secondary w-full">
-                            <div class="h-full bg-primary w-[12%]"></div>
+                            <div class="h-full bg-primary animate-pulse" style="width: 100%"></div>
                         </div>
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span>LATENCY</span>
-                            <span>{latency > 0 ? latency + "ms" : "Calculating..."}</span>
+                        <div class="flex justify-between text-xs mb-1 uppercase font-mono">
+                            <span>Grid Latency</span>
+                            <span class="text-green-500 font-bold">{latency > 0 ? latency + "ms" : "---"}</span>
                         </div>
                         <div class="h-1 bg-secondary w-full">
-                            <div class="h-full bg-green-500 transition-all duration-500" style="width: {Math.min(100, (1000/Math.max(1, latency))*10)}%"></div>
+                            <div class="h-full bg-green-500 transition-all duration-500" style="width: {latency > 0 ? Math.min(100, (1000/Math.max(1, latency))*10) : 0}%"></div>
                         </div>
                     </div>
                 </div>
@@ -204,17 +289,9 @@
                 {#each {length: 6} as _}
                     <SpotlightCard>
                         <div class="animate-pulse space-y-4">
-                            <div class="flex justify-between">
-                                <div class="h-4 w-16 bg-muted/20 rounded"></div>
-                                <div class="h-4 w-4 bg-muted/20 rounded-full"></div>
-                            </div>
+                            <div class="h-4 w-16 bg-muted/20 rounded"></div>
                             <div class="h-6 w-3/4 bg-muted/20 rounded"></div>
                             <div class="h-3 w-full bg-muted/20 rounded"></div>
-                            <div class="h-3 w-1/2 bg-muted/20 rounded"></div>
-                            <div class="pt-4 flex justify-between items-center">
-                                <div class="h-4 w-12 bg-muted/20 rounded"></div>
-                                <div class="h-8 w-20 bg-muted/20 rounded"></div>
-                            </div>
                         </div>
                     </SpotlightCard>
                 {/each}
@@ -234,22 +311,17 @@
                             </div>
                             <ShieldCheck class="w-4 h-4 text-green-500" />
                         </div>
-                        <p class="font-bold truncate">{warden.nickname}</p>
+                        <p class="font-bold truncate uppercase tracking-tight">{warden.nickname}</p>
                         <p class="text-[10px] font-mono text-muted-foreground break-all mb-4">{warden.authority}</p>
                         
-                                                <div class="flex justify-between items-center border-t border-border pt-4 mt-auto">
-                        
-                                                    <span class="text-xs text-primary font-bold">
-                                                        ${((warden.price / 1e9) * solPrice * 1024).toFixed(4)}/GB
-                                                    </span>
-                        
-                                                    <button 
-                        
-                                                        class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        
-                        
+                        <div class="flex justify-between items-center border-t border-border pt-4 mt-auto">
+                            <span class="text-xs text-primary font-bold">
+                                ${((warden.price / 1e9) * solPrice * 1024).toFixed(4)}/GB
+                            </span>
+                            <button 
+                                class="text-xs bg-white text-black px-3 py-1 font-bold hover:bg-primary transition-colors disabled:opacity-50"
                                 onclick={() => connectToWarden("seeker", warden.authority, warden.id, 100)}
-                                disabled={isConnected}
+                                disabled={isConnected || isDisconnecting}
                             >
                                 CONNECT
                             </button>

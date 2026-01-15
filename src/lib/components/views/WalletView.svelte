@@ -3,7 +3,8 @@
     import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
     import BracketCard from "$lib/components/ui/BracketCard.svelte";
     import Loading from "$lib/components/ui/Loading.svelte";
-    import { getWalletBalance, getAddresses } from "$lib/api";
+    import { getWalletBalance, getAddresses, transferFunds } from "$lib/api";
+    import { addToast } from "$lib/stores/toast";
     import { Wallet, ArrowRight, Copy, RefreshCw } from "lucide-svelte";
     import QRCode from 'qrcode';
 
@@ -13,6 +14,7 @@
     let address = "Loading...";
     let qrDataUrl = "";
     let loading = true;
+    let sending = false;
     let recipient = "";
     let amount = "";
 
@@ -38,12 +40,32 @@
         }
     }
 
+    async function handleSend() {
+        if (!recipient || !amount) {
+            addToast("Please provide recipient and amount", "error");
+            return;
+        }
+        
+        sending = true;
+        try {
+            const res = await transferFunds(profile, recipient, parseFloat(amount));
+            addToast(`Transfer Successful: ${res.signature.slice(0, 8)}...`, "success");
+            recipient = "";
+            amount = "";
+            refresh();
+        } catch (e) {
+            addToast(`Transfer Failed: ${e}`, "error");
+        } finally {
+            sending = false;
+        }
+    }
+
     // React to profile changes
     $: if (profile) { refresh(); }
 
     function copyAddress() {
         navigator.clipboard.writeText(address);
-        alert("Address copied!");
+        addToast("Address copied to clipboard", "info");
     }
 </script>
 
@@ -57,8 +79,8 @@
     <BracketCard>
         <div class="flex justify-between items-start mb-6">
             <span class="text-xs font-mono text-muted-foreground uppercase tracking-widest">{profile} WALLET</span>
-            <button onclick={refresh} disabled={loading}>
-                <RefreshCw class="w-4 h-4 text-muted-foreground hover:text-white {loading ? 'animate-spin' : ''}" />
+            <button onclick={refresh} disabled={loading || sending}>
+                <RefreshCw class="w-4 h-4 text-muted-foreground hover:text-white {loading || sending ? 'animate-spin' : ''}" />
             </button>
         </div>
 
@@ -113,16 +135,25 @@
                     <input 
                         type="number" 
                         bind:value={amount}
-                        class="w-full bg-black border border-border p-4 text-xl focus:border-primary outline-none text-white font-mono transition-colors"
+                        class="w-full bg-black border border-border p-4 text-xl focus:border-primary outline-none text-white font-mono transition-colors pr-16"
                         placeholder="0.00"
                     />
-                    <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-primary font-bold">SOL</span>
+                    <button 
+                        class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-primary font-bold hover:text-white transition-colors border border-primary/30 px-2 py-1 bg-primary/10 hover:bg-primary/20"
+                        onclick={() => amount = Math.max(0, balance - 0.005).toFixed(4)}
+                    >
+                        MAX
+                    </button>
                 </div>
             </div>
         </div>
 
-        <button class="w-full bg-primary text-black font-bold py-4 mt-8 hover:bg-white transition-all active:scale-[0.98] relative z-10 uppercase tracking-widest">
-            Execute Transaction
+        <button 
+            class="w-full bg-primary text-black font-bold py-4 mt-8 hover:bg-white transition-all active:scale-[0.98] relative z-10 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+            onclick={handleSend}
+            disabled={sending}
+        >
+            {sending ? 'Processing...' : 'Execute Transaction'}
         </button>
     </div>
 </div>

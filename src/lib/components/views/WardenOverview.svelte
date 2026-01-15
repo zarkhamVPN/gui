@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import SpotlightCard from "$lib/components/ui/SpotlightCard.svelte";
     import BracketCard from "$lib/components/ui/BracketCard.svelte";
     import Loading from "$lib/components/ui/Loading.svelte";
@@ -16,25 +16,35 @@
     let loading = true;
     let showRegisterModal = false;
     let showStakeModal = false;
+    let statusInterval: any;
     
     // Reg form
     let stakeAmount = 1.0;
     let stakeToken = "SOL";
 
-    onMount(refresh);
+    onMount(() => {
+        refresh();
+        statusInterval = setInterval(refresh, 2000);
+    });
+
+    onDestroy(() => {
+        if (statusInterval) clearInterval(statusInterval);
+    });
 
     async function refresh() {
-        loading = true;
+        // Only show loading spinner on initial load or if explicitly requested
+        const initial = loading && !stats;
         try {
-            const nStatus = await getNodeStatus();
+            const [nStatus, wStatus, balData] = await Promise.all([
+                getNodeStatus(),
+                getWardenStatus("warden"),
+                getWalletBalance("warden")
+            ]);
+
             nodeStatus = nStatus;
             isRunning = nStatus.isRunning;
-
-            const wStatus = await getWardenStatus("warden");
             isRegistered = wStatus.is_registered;
             stats = wStatus.warden;
-
-            const balData = await getWalletBalance("warden");
             balance = balData.lamports / 1e9;
         } catch (e) {
             console.error(e);

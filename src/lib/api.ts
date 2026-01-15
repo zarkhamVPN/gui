@@ -168,21 +168,21 @@ export async function getProfile() {
 
 
 export async function getHistory(profile: string) {
-
-
-
     try {
-
         const res = await fetch(`${API_BASE}/history?profile=${profile}`);
-
         if (!res.ok) throw new Error("History API Error");
-
         return await res.json();
-
     } catch (e) {
-
         return { solHistory: [], arkhamHistory: [], connectionHistory: [], throughputHistory: [] };
-
     }
+}
 
+export async function transferFunds(profile: string, recipient: string, amount: number) {
+    const res = await fetch(`${API_BASE}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, recipient, amount })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
 }
