@@ -4,16 +4,25 @@
   import { Shield, Radio, ChevronDown, Wifi, Lock } from "lucide-svelte";
   import { activeMode, activeTab } from "$lib/stores/app";
   import { onMount } from "svelte";
-  import { getProfile } from "$lib/api";
+  import { getProfile, getNodeStatus } from "$lib/api";
 
   let showDropdown = false;
+  let version = "v1.0.0";
 
   onMount(async () => {
-      const data = await getProfile();
-      if (data.profile === 'seeker') {
+      const [profileData, statusData] = await Promise.all([
+          getProfile(),
+          getNodeStatus()
+      ]);
+
+      if (profileData.profile === 'seeker') {
           $activeMode = 'seeker';
       } else {
           $activeMode = 'warden';
+      }
+
+      if (statusData.version) {
+          version = statusData.version;
       }
   });
 
@@ -124,7 +133,7 @@
   <!-- Footer -->
   <footer class="border-t border-border py-4 bg-card text-[10px] uppercase font-mono text-muted-foreground tracking-widest">
     <div class="container mx-auto px-6 flex justify-between items-center">
-      <span>ZARKHAM CORE v1.0.0</span>
+      <span>ZARKHAM CORE {version}</span>
       <div class="flex items-center gap-6">
         <div class="flex items-center gap-2">
           <Wifi class="w-3 h-3 text-green-500" />
